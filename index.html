@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Valmez Adventure</title>
+    <link rel="stylesheet" href="https://pyscript.net/latest/pyscript.css" />
+    <script defer src="https://pyscript.net/latest/pyscript.js"></script>
+    
+    <style>
+        body { background-color: #1a1a1a; color: #00ff00; font-family: 'Courier New', monospace; padding: 20px; max-width: 900px; margin: 0 auto; }
+        #vystup { border: 2px solid #00ff00; padding: 20px; height: 500px; overflow-y: auto; background-color: black; margin-bottom: 20px; white-space: pre-wrap; }
+        input { width: 70%; padding: 10px; background-color: #333; color: white; border: 1px solid #00ff00; font-family: inherit; font-size: 16px; }
+        button { width: 20%; padding: 10px; background-color: #004400; color: #00ff00; border: 1px solid #00ff00; cursor: pointer; font-family: inherit; font-size: 16px; }
+        button:hover { background-color: #006600; }
+        h1 { text-align: center; }
+    </style>
+</head>
+<body>
+
+    <h1 style="text-align: center;">Valmez Adventure</h1>
+    <div id="vystup">Načítám PyScript... (Chvilku počkejte)</div>
+    <div>
+        <input type="text" id="prikaz" placeholder="Zadej příkaz..." autofocus>
+        <button id="tlacitko" py-click="hra">Odeslat</button>
+    </div>
+
+    <py-script>
+        from js import document, console
+        
+        # --- GLOBÁLNÍ PROMĚNNÉ ---
+        inventar = [] 
+        aktLokace = "Busák" 
+        hra_bezi = True 
+
+        mista = {
+            "Busák": {"doleva": "Náměstí", "doprava": "Penny", "dopředu": "Škola", "dozadu": "Přístav",
+                       "item" : "peníze", "popis" : "Cigáni tu jedou tour de gádžo"},
+            "Penny": {"doleva" : "Busák", "item": "stříkačka",
+                      "popis" : "Prodíráš se skrz vlny důchodců ale ke v chodu se nedostáváš"},
+            "Přístav": {"dopředu": "Busák", "item": "pivo",
+                        "popis": "Poklídná hospůdka, sedí tam jen pochybná skupina, furt melou něco o omáčce"},
+            "Náměstí": {"doprava" : "Busák", "item": "bezďák",
+                        "popis" : "Měšťáci, pochybné existence, Sůra na lavičce... ale něco tě zaujalo"},
+            "Škola": { "popis": "Po cestě do školy, potkáváš skupinku cigánů"}
+        }
+
+        # --- POMOCNÉ FUNKCE PRO WEB (Korektní odsazení) ---
+        def vypis(text=""):
+            # Tato funkce nahrazuje print()
+            el = document.getElementById("vystup")
+            aktualni = el.innerHTML
+            el.innerHTML = aktualni + str(text) + "\n"
+            el.scrollTop = el.scrollHeight
+
+        def smaz_obrazovku():
+            # Náhrada os.system("clear")
+            document.getElementById("vystup").innerHTML = ""
+
+        def status():
+            vypis("-" * 30)
+            vypis(f"Jsi v {aktLokace}")
+            vypis(mista[aktLokace]["popis"])
+            vypis(f"Inventář: {inventar}" )
+            vypis("-" * 30)
+            if "item" in mista[aktLokace] and mista[aktLokace]["item"]:
+                mistoItem = mista[aktLokace]["item"]
+                vypis(f"Vidíš PŘEDMĚT: {mistoItem}")
+                vypis("=" * 10)
+                vypis()
+        
+        # --- HLAVNÍ HERNÍ LOGIKA (Korektní odsazení) ---
+        def hra(*args):
+            global aktLokace, inventar, hra_bezi
+            
+            if not hra_bezi:
+                return
+
+            # Získání inputu z HTML (náhrada input() )
+            input_element = document.getElementById("prikaz")
+            raw_move = input_element.value
+            
+            input_element.value = ""
+            if not raw_move:
+                return
+
+            # vyčistíme obrazovku
+            smaz_obrazovku()
+            vypis(f"> {raw_move}")
+
+            # --- PARSOVÁNÍ VSTUPU ---
+            move = raw_move.lower().strip() 
+            move = move.split(" ", 1) 
+        
+            if len(move) < 2:
+                vypis("Musíš zadat příkaz i cíl! (např. 'jdi dopředu')")
+                status()
+                return 
+
+            # --- LOGIKA SEBER ---
+            if move[0] == "seber":
+                if move[1] == mista[aktLokace]["item"] and mista[aktLokace]["item"]:
+                    vypis(f"Sebral jsi {move[1]}")
+                    inventar.append(move[1])
+                    mista[aktLokace]["item"] = ""
+                    vypis("Inventář:", inventar)
+                else:
+                    vypis(f"{move[1]} tady není!")
+            
+            # --- LOGIKA JDI ---      
+            elif move[0] == "jdi":
+                if move[1] in mista[aktLokace]:
+                    aktLokace =  mista[aktLokace][move[1]]
+                else:
+                    vypis("Potloukat se po Valmezu není bezpečné, zůstaň tam kde to znáš!")
+            
+            # --- NEZNÁMÝ PŘÍKAZ ---
+            else:
+                vypis("Neznámý příkaz. Zkus 'jdi' nebo 'seber'.")
+
+            # -------------------------------------
+            # Kontrola Konce Hry (Victory / Loss)
+            # -------------------------------------
+
+            # 1. Smrt stříkačkou (Prioritní)
+            if "stříkačka" in inventar:
+                vypis("\nNenapadlo tě nic lepšího než tam tu neznámou substanci poslat")
+                vypis("Po dlouhých pocitách euforie a halucinacích o Sůrově ségře umíráš...")
+                vypis("\n=== Konec hry (Sebevražda stříkačkou) ===")
+                hra_bezi = False 
+                document.getElementById("prikaz").disabled = True
+                return
+            
+            # 2. Kontrola v Přístavu 
+            if aktLokace == "Přístav":
+                if "bezďák" in inventar:
+                    vypis("\nHospodský se lekl tvého bezďáka a oba vás preventivně polil absinthem a zapálil")
+                    vypis("\n=== Konec hry (Opečen) ===")
+                    hra_bezi = False 
+                    document.getElementById("prikaz").disabled = True
+                    return
+                elif "peníze" not in inventar:
+                    vypis("\nSnažil jsi se koupit pivo, ale nemáš peníze. Hospodský tě nechává si to odpracovat u něj v kuchyni")
+                    vypis("Po konci výpomoci vybíháš ke dveřím hospody, tam už je ale nastoupený Juríček, a předává ti test se známkou 6")
+                    vypis("\n=== Konec hry (Prohra/Test za 6) ===")
+                    hra_bezi = False 
+                    document.getElementById("prikaz").disabled = True
+                    return
+                    
+            # 3. Kontrola ve Škole 
+            if aktLokace == "Škola":
+                vypis("\n" + mista[aktLokace]["popis"]) 
+                
+                # VÍTĚZSTVÍ
+                if "pivo" in inventar and "bezďák" in inventar:
+                    vypis("\nDo cesty se jim ale postavil tvůj bezďák Albrecht, který ti zachránil život")
+                    vypis("Dobíháš do hodiny, ale už je pozdě. Naštěstí pro tebe máš u sebe škopek piva, který obměkčí Juríčka.")
+                    vypis("\n=== VYHRÁL JSI!!! ===")
+                    hra_bezi = False 
+                    document.getElementById("prikaz").disabled = True
+                    return
+                
+                # PROHRA (Bez piva, ale s bezďákem)
+                elif "bezďák" in inventar and "pivo" not in inventar:
+                    vypis("\nDo cesty se jim ale postavil tvůj bezďák Albrecht, který ti zachránil život")
+                    vypis("Dobíháš do hodiny, ale už je pozdě. Juríček se na tebe podívá, vytahuje z kapsy Mauser model 1943 a stříli tě do hlavy")
+                    vypis("\n=== Konec hry (Prohra/Juríček) ===")
+                    hra_bezi = False 
+                    document.getElementById("prikaz").disabled = True
+                    return
+                    
+                # PROHRA (Bez bezďáka)
+                elif "bezďák" not in inventar:
+                    vypis("\nPřepadli tě, a protože ses neměl čím nebo kým bránit, do školy jsi už nedošel")
+                    vypis("\n=== Konec hry (Prohra/Přepaden) ===")
+                    hra_bezi = False 
+                    document.getElementById("prikaz").disabled = True
+                    return
+
+            # Pokud hra stále běží, vypíšeme status pro další kolo
+            if hra_bezi:
+                status()
+
+        # --- START HRY ---
+        def start_hry():
+            smaz_obrazovku()
+            vypis("=" * 10)
+            vypis("Bus měl spoždění a ty vybíháš do špinavého Valmezu s jediným cílem - musím stihnout Jurdův test...")
+            vypis('OVLÁDÁNÍ: seber [věc], jdi [směr]')
+            vypis("=" * 10)
+            status()
+        
+        # Při načítání PyScriptu se provede
+        start_hry()
+
+        # Binding the Enter key pro pohodlnější hraní
+        def on_enter(e):
+            if e.key == "Enter":
+                hra()
+        
+        document.getElementById("prikaz").onkeypress = on_enter
+    </py-script>
+</body>
+</html>
